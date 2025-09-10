@@ -2,11 +2,12 @@ import logging
 import requests
 import json
 import os
+import time
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import aiohttp
 import pytz
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -18,13 +19,11 @@ from telegram.ext import (
 from telethon import TelegramClient, events
 from telethon.tl.types import Message
 
-# Конфигурация
-API_ID = 21695610  # Получить с my.telegram.org
-API_HASH = '1f3ccb2d1d14afc4bacd38133583356a'  # Получить с my.telegram.org
-BOT_TOKEN = '7856559014:AAHY8ivsZvOOYA56n98GVHrQy3altzzFv9M'  # Получить от @BotFather
-API_KEY = "sk-f6501722e1fb48f695782c0219e4d74f"
+API_ID = 0
+API_HASH = ''
+BOT_TOKEN = ''
+API_KEY = ""  # DeepSeek API
 
-# Хранилище данных (в реальном проекте лучше использовать БД)
 sub_file = open("sub.txt", "r")
 prompt_file = open("prompt.txt", "r")
 SUBSCRIPTIONS = sub_file.read().split("\n")
@@ -52,11 +51,11 @@ async def deepseek_api_call(prompt):
     }
 
     data = {
-        "model": "deepseek-chat",  # Уточните актуальное название модели
+        "model": "deepseek-chat",
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7,  # Параметр креативности (0-1)
+        "temperature": 0.7,
     }
 
     response = requests.post(API_URL, headers=headers, json=data)
@@ -64,13 +63,12 @@ async def deepseek_api_call(prompt):
         return response.json()["choices"][0]["message"]["content"]
     else:
         print("Ошибка запроса:", response.status_code)
-        print(response.text)  # Вывод ошибки, если что-то пошло не так
+        print(response.text)
         return ""
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start(update: Update) -> None:
     """Обработчик команды /start"""
-    user_id = update.effective_user.id
 
     keyboard = [
         [InlineKeyboardButton("Мои подписки", callback_data='list_subscriptions')],
@@ -90,7 +88,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Обработчик нажатий кнопок"""
     query = update.callback_query
     await query.answer()
-
 
     if query.data == 'list_subscriptions':
         await list_subscriptions(query)
@@ -188,7 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await start(update, context)
 
 
-async def get_summary(query, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def get_summary(query) -> None:
     """Получить сводку по подпискам"""
     user_id = query.from_user.id
     await query.edit_message_text("Начинаю сбор и анализ сообщений...")
@@ -248,12 +245,11 @@ async def get_summary(query, context: ContextTypes.DEFAULT_TYPE) -> None:
         full_prompt = f"{PROMPT}\n\n{messages_text}"
 
         try:
-            # Здесь замените вызов OpenAI на вызов DeepSeek
-            response = await deepseek_api_call(full_prompt)  # Предполагается, что у вас есть функция deepseek_api_call
+            response = await deepseek_api_call(full_prompt)
 
             summary = response
 
-            await query.message.reply_text(f"📌 Сводка за последние 24 часа:\n\n")
+            await query.message.reply_text("📌 Сводка за последние 24 часа:\n\n")
             length = len(summary)
             ind = 0
             while ind < length:
@@ -274,9 +270,24 @@ async def get_summary(query, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.message.reply_text("Произошла ошибка при получении сводки.")
 
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def error_handler(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик ошибок"""
     logger.error(f"Ошибка: {context.error}")
+
+
+def alarm():
+    bot = Bot(BOT_TOKEN)
+    user_id = 966182072
+    while True:
+        hours = datetime.now().hour
+        sec = datetime.now().second
+        if True:
+            bot.send_message(
+                chat_id=user_id,
+                text="awa",
+                parse_mode="HTML"
+            )
+        time.sleep(1)
 
 
 def main() -> None:
@@ -291,6 +302,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_error_handler(error_handler)
 
+    alarm()
     application.run_polling()
 
 
